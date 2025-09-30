@@ -52,8 +52,22 @@ public class PlayerController : MonoBehaviour
 
     private void HorizontalMovement()
     {
+        float x = Input.GetAxis("Horizontal");
+
+        if (x != 0)
+        {
+            xVelocity = Mathf.Lerp(xVelocity, x * maxSpeed, acceleration * Time.deltaTime);
+        }
+        else
+        {
+            xVelocity = Mathf.Lerp(xVelocity, 0f, deceleration * Time.deltaTime);
+        }
+
+        rb2D.linearVelocity = new Vector2(xVelocity, rb2D.linearVelocity.y);
+
+        return;
         //Get the raw input
-        float x = Input.GetAxisRaw("Horizontal");
+        x = Input.GetAxisRaw("Horizontal");
 
         //add our input to our velocity
         //This provides acceleration +10m/s/s
