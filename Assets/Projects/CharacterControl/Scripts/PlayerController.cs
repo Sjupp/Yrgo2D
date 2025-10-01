@@ -1,6 +1,7 @@
 using PrimeTween;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 //This script is a clean powerful solution to a top-down movement player
 public class PlayerController : MonoBehaviour
@@ -10,32 +11,41 @@ public class PlayerController : MonoBehaviour
     public float acceleration = 20; //How fast we accelerate
     public float deceleration = 4; //brake power
 
-
     [Header("Jump")]
     public float jumpPower = 8; //How strong our jump is
     public int maxJumps = 2; //We added a double jump to the game
     public float groundCheckDistance = 0.05f; //how far outside our character we should raycast
     public float extraGravity = 3; //Makes the jump feel better.
     [SerializeField] private ShakeSettings _jumpTween;
+    [SerializeField] private bool _useCoyoteTime = false;
+    [SerializeField] private float _coyoteTimeDuration = 0.2f;
 
     //Private variables
     Rigidbody2D rb2D; //Ref to our rigidbody
     float xVelocity; //Our current x-velocity
     float feetOffset; //Length of the raycast
     int currentJumps = 0; //remaining jumps, also works as ground check
-    private Animator _animator = null;
-    private SpriteRenderer _spriteRenderer = null;
-    [SerializeField] private GameObject _playerSpriteObject = null;
-    [SerializeField] private GameObject _spriteBase = null;
+    
     private bool _isGrounded = false;
-
+    private bool _isRunning = false;
     private InputAction m_MoveAction;
     private InputAction m_JumpAction;
-
     private Vector2 _move = Vector2.zero;
+    private int _xVelocityStringHash = 0;
+    private int _airborneStringHash = 0;
+    private Animator _animator = null;
+    private SpriteRenderer _spriteRenderer = null;
+    private float _coyoteTimer = 0f;
+    
+    [SerializeField] private GameObject _playerSpriteObject = null;
+    [SerializeField] private GameObject _spriteBase = null;
+    [SerializeField] private ParticleSystem _dashVFX = null;
+    [SerializeField] private ParticleSystem _jumpVFX = null;
 
-    private int _xVelocityString = 0;
-    private int _airborneString = 0;
+    [Header("Juice")]
+    [SerializeField] private bool _animation = true;
+    [SerializeField] private bool _tweens = true;
+    [SerializeField] private bool _vfx = true;
 
     void Awake()
     {
@@ -43,6 +53,7 @@ public class PlayerController : MonoBehaviour
         _animator = _playerSpriteObject.GetComponent<Animator>();
         _spriteRenderer = _playerSpriteObject.GetComponent<SpriteRenderer>();
 
+        //Using new input system
         m_MoveAction = InputSystem.actions.FindAction("Player/Move");
         m_JumpAction = InputSystem.actions.FindAction("Player/Jump");
 
@@ -55,8 +66,8 @@ public class PlayerController : MonoBehaviour
         //Calculate player size based on our colliders, length of raycast
         //feetOffset = GetComponent<Collider2D>().bounds.extents.y;// + 0.02f;
 
-        _xVelocityString = Animator.StringToHash("xVelocity");
-        _airborneString = Animator.StringToHash("Airborne");
+        _xVelocityStringHash = Animator.StringToHash("xVelocity");
+        _airborneStringHash = Animator.StringToHash("Airborne");
     }
 
     void Update()
@@ -93,9 +104,30 @@ public class PlayerController : MonoBehaviour
         
         rb2D.linearVelocity = new Vector2(xVelocity, rb2D.linearVelocity.y);
 
-        _spriteRenderer.flipX = xVelocity != 0 && xVelocity > 0f;
+        float xVelocityAbsolute = Mathf.Abs(xVelocity);
 
-        _animator.SetFloat(_xVelocityString, Mathf.Abs(xVelocity / maxSpeed));
+        bool facingRight = xVelocity != 0 && xVelocity > 0f;
+        _spriteRenderer.flipX = facingRight;
+        _dashVFX.transform.localScale = facingRight ? new Vector3(-1f, 1f, 1f) : Vector3.one;
+
+        if (_animation)
+        {
+            _animator.SetFloat(_xVelocityStringHash, Mathf.Abs(xVelocity / maxSpeed));
+        }
+
+        if (_vfx)
+        {
+            if (xVelocityAbsolute > 0.05f && !_isRunning && _isGrounded)
+            {
+                _dashVFX.Play();
+            }
+            else if (_isRunning && xVelocityAbsolute <= 0.05f || !_isGrounded)
+            {
+                _dashVFX.Stop();
+            }
+        }
+
+        _isRunning = xVelocityAbsolute > 0.05f;
     }
 
     private void GroundCheck()
@@ -105,16 +137,45 @@ public class PlayerController : MonoBehaviour
         rayPos.y -= feetOffset;
 
         //Fire a raycast
-        RaycastHit2D hit = Physics2D.Raycast(rayPos, Vector2.down, groundCheckDistance);
+        //RaycastHit2D hit = Physics2D.Raycast(rayPos, Vector2.down, groundCheckDistance);
+        RaycastHit2D hit = Physics2D.BoxCast(transform.position + Vector3.up, Vector2.one * 1f, 0f, Vector2.down, groundCheckDistance);
+
+        // check to see if we just landed
         if (!_isGrounded && hit)
         {
-            Tween.PunchScale(_spriteBase.transform, new Vector3(0.3f, -0.2f, 0.3f), 0.2f, 5);
+            if (hit.collider.TryGetComponent(out Platform comp))
+            {
+                Debug.Log("Landed on color: " + comp._platformColor.ToString());
+                var vfxMain = _dashVFX.main;
+                vfxMain.startColor = comp._platformColor;
+            }
+
+            if (_tweens)
+            {
+                Tween.PunchScale(_spriteBase.transform, new Vector3(0.3f, -0.2f, 0.3f), 0.2f, 5);
+            }
+
+            if (_vfx)
+            {
+                if (_isRunning)
+                {
+                    _dashVFX.Play();
+                }
+            }
         }
 
-        Debug.Log("hit: " + hit);
+        if (_isGrounded && !hit)
+        {
+            // just jumped or left the ground
+            _coyoteTimer = Time.time;
+        }
+
         _isGrounded = hit;
 
-        _animator.SetBool(_airborneString, !_isGrounded);
+        if (_animation)
+        {
+            _animator.SetBool(_airborneStringHash, !_isGrounded);
+        }
 
         //Debug draw our ray so we can see it.
         Debug.DrawRay(rayPos, Vector2.down * groundCheckDistance);
@@ -129,10 +190,38 @@ public class PlayerController : MonoBehaviour
         //if we press the button and have jumps remaining
         if (m_JumpAction.WasPressedThisFrame() && currentJumps < maxJumps)
         {
-            Tween.PunchScale(_spriteBase.transform, _jumpTween);
-            currentJumps++;
-            //Apply our jump power in the y direction
-            rb2D.linearVelocity = new Vector2(rb2D.linearVelocity.x, jumpPower);
+            if (_isGrounded)
+            {
+                // do normal jump from ground
+
+                currentJumps++;
+                //Apply our jump power in the y direction
+                rb2D.linearVelocity = new Vector2(rb2D.linearVelocity.x, jumpPower);
+
+                Debug.Log("Normal time jump");
+
+            }
+            else if (_coyoteTimer + _coyoteTimeDuration < Time.time)
+            {
+                // do coyote time jump
+
+                currentJumps++;
+                //Apply our jump power in the y direction
+                rb2D.linearVelocity = new Vector2(rb2D.linearVelocity.x, jumpPower);
+                Debug.Log("Coyote time jump");
+            }
+
+
+            //if (_tweens)
+            //{
+            //    Tween.PunchScale(_spriteBase.transform, _jumpTween);
+            //}
+
+            //if (_vfx)
+            //{
+            //    _jumpVFX.Play();
+            //}
+
         }
 
         if (m_JumpAction.WasReleasedThisFrame() && rb2D.linearVelocity.y > 0)
