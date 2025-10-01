@@ -16,21 +16,6 @@ public class CollideObject : MonoBehaviour
                 comp.Priority = false;
                 Destroy(collision.gameObject);
             }
-
-            return;
-            var rand = Random.Range(0, 3);
-            switch (rand)
-            {
-                case 0:
-                    // nothing
-                    break;
-                case 1:
-                    Destroy(collision.gameObject);
-                    break;
-                case 2:
-                    //instantiate
-                    break;
-            }
         }
     }
 }
