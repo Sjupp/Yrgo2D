@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 //This script is a clean powerful solution to a top-down movement player
 public class PlayerController : MonoBehaviour
@@ -20,10 +21,28 @@ public class PlayerController : MonoBehaviour
     float xVelocity; //Our current x-velocity
     float feetOffset; //Length of the raycast
     int currentJumps = 0; //remaining jumps, also works as ground check
+    private Animator _animator = null;
+    [SerializeField] private GameObject _playerSpriteObject = null;
 
-    private void Start()
+    private bool _useTimer = false;
+    private float _timer = 0f;
+    private bool _displayTime = false;
+
+    private InputAction m_MoveAction;
+    private InputAction m_JumpAction;
+
+    private Vector2 _move = Vector2.zero;
+
+    void Awake()
     {
         rb2D = GetComponent<Rigidbody2D>(); //assign our ref.
+        _animator = _playerSpriteObject.GetComponent<Animator>();
+
+        m_MoveAction = InputSystem.actions.FindAction("Player/Move");
+        m_JumpAction = InputSystem.actions.FindAction("Player/Jump");
+
+        m_MoveAction.Enable();
+        m_JumpAction.Enable();
 
         //setting so raycasts don't hit the object they start in.
         Physics2D.queriesStartInColliders = false;
@@ -34,6 +53,9 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+
+        _move.x = m_MoveAction.ReadValue<Vector2>().x;
+
         GravityAdjust(); //adjusts gravity
         HorizontalMovement(); //Handles Horizontal movement
         GroundCheck(); //check if we are on ground
@@ -52,11 +74,9 @@ public class PlayerController : MonoBehaviour
 
     private void HorizontalMovement()
     {
-        float x = Input.GetAxis("Horizontal");
-
-        if (x != 0)
+        if (_move.x != 0)
         {
-            xVelocity = Mathf.Lerp(xVelocity, x * maxSpeed, acceleration * Time.deltaTime);
+            xVelocity = Mathf.Lerp(xVelocity, _move.x * maxSpeed, acceleration * Time.deltaTime);
         }
         else
         {
@@ -65,29 +85,7 @@ public class PlayerController : MonoBehaviour
 
         rb2D.linearVelocity = new Vector2(xVelocity, rb2D.linearVelocity.y);
 
-        return;
-        //Get the raw input
-        x = Input.GetAxisRaw("Horizontal");
-
-        //add our input to our velocity
-        //This provides acceleration +10m/s/s
-        xVelocity += x * acceleration * Time.deltaTime;
-
-        //Check our max speed, if our magnitude is faster them max speed
-        xVelocity = Mathf.Clamp(xVelocity, -maxSpeed, maxSpeed);
-
-        //If we have zero input from the player
-        //(x < 0 == xVelocity > 0) checks if input is in the opposite direction of movement
-        if (x == 0 || (x < 0 == xVelocity > 0))
-        {
-            //Reduce our speed based on how fast we are going
-            //A value of 0.9 would remove 10% or our speed
-            xVelocity *= 1 - deceleration * Time.deltaTime;
-            xVelocity *= Mathf.Clamp01(1 - deceleration * Time.fixedDeltaTime);
-        }
-
-        //Now we can move with the rigidbody and we get proper collisions
-        rb2D.linearVelocity = new Vector2(xVelocity, rb2D.linearVelocity.y);
+        _animator.SetFloat("xVelocity", Mathf.Abs(xVelocity / maxSpeed));
     }
 
     private void GroundCheck()
@@ -98,6 +96,7 @@ public class PlayerController : MonoBehaviour
 
         //Fire a raycast
         RaycastHit2D hit = Physics2D.Raycast(rayPos, Vector2.down, groundCheckDistance);
+        _animator.SetBool("Airborne", !hit);
 
         //Debug draw our ray so we can see it.
         Debug.DrawRay(rayPos, Vector2.down * groundCheckDistance);
@@ -105,19 +104,21 @@ public class PlayerController : MonoBehaviour
         // If it hits something...
         if (hit.collider != null)
             currentJumps = 0;
+
+
     }
 
     private void Jump()
     {
         //if we press the button and have jumps remaining
-        if (Input.GetButtonDown("Jump") && currentJumps < maxJumps)
+        if (m_JumpAction.WasPressedThisFrame() && currentJumps < maxJumps)
         {
             currentJumps++;
             //Apply our jump power in the y direction
             rb2D.linearVelocity = new Vector2(rb2D.linearVelocity.x, jumpPower);
         }
 
-        if (Input.GetButtonUp("Jump") && rb2D.linearVelocity.y > 0)
+        if (m_JumpAction.WasReleasedThisFrame() && rb2D.linearVelocity.y > 0)
         {
             //Cut the jump short by reducing the upward velocity.
             //Same result as button down but on one line.
