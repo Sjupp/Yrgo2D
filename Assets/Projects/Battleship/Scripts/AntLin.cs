@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Battleship
@@ -35,6 +36,11 @@ namespace Battleship
             }
             return vector;
         }
+
+        public static Direction RandomDirection()
+        {
+            return (Direction)Random.Range(0, 4);
+        }
     }
 
     public class AntLin : IBattleship
@@ -61,6 +67,24 @@ namespace Battleship
             //we now need to place our ships, lets just do one for the demo.
 
             //Since we haven't placed all our ships, this would not validate.
+
+            List<int> placedShips = new List<int> { 4, 3, 3, 2, 1 };
+            int placedShipNumber = 0;
+            bool placedAllShips = false;
+            while (!placedAllShips)
+            {
+                if (TryPlaceShip(
+                    new Vector2Int(Random.Range(0, gridSize.x), Random.Range(0, gridSize.y)),
+                    placedShips[placedShipNumber],
+                    Helper.RandomDirection()
+                    ))
+                {
+                    placedShipNumber++;
+                }
+
+                if (placedShipNumber == placedShips.Count - 1)
+                    placedAllShips = true;
+            }
 
             return myPlayField;
         }
