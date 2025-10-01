@@ -1,3 +1,4 @@
+using PrimeTween;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -15,6 +16,7 @@ public class PlayerController : MonoBehaviour
     public int maxJumps = 2; //We added a double jump to the game
     public float groundCheckDistance = 0.05f; //how far outside our character we should raycast
     public float extraGravity = 3; //Makes the jump feel better.
+    [SerializeField] private ShakeSettings _jumpTween;
 
     //Private variables
     Rigidbody2D rb2D; //Ref to our rigidbody
@@ -22,21 +24,24 @@ public class PlayerController : MonoBehaviour
     float feetOffset; //Length of the raycast
     int currentJumps = 0; //remaining jumps, also works as ground check
     private Animator _animator = null;
+    private SpriteRenderer _spriteRenderer = null;
     [SerializeField] private GameObject _playerSpriteObject = null;
-
-    private bool _useTimer = false;
-    private float _timer = 0f;
-    private bool _displayTime = false;
+    [SerializeField] private GameObject _spriteBase = null;
+    private bool _isGrounded = false;
 
     private InputAction m_MoveAction;
     private InputAction m_JumpAction;
 
     private Vector2 _move = Vector2.zero;
 
+    private int _xVelocityString = 0;
+    private int _airborneString = 0;
+
     void Awake()
     {
         rb2D = GetComponent<Rigidbody2D>(); //assign our ref.
         _animator = _playerSpriteObject.GetComponent<Animator>();
+        _spriteRenderer = _playerSpriteObject.GetComponent<SpriteRenderer>();
 
         m_MoveAction = InputSystem.actions.FindAction("Player/Move");
         m_JumpAction = InputSystem.actions.FindAction("Player/Jump");
@@ -48,12 +53,14 @@ public class PlayerController : MonoBehaviour
         Physics2D.queriesStartInColliders = false;
 
         //Calculate player size based on our colliders, length of raycast
-        feetOffset = GetComponent<Collider2D>().bounds.extents.y;// + 0.02f;
+        //feetOffset = GetComponent<Collider2D>().bounds.extents.y;// + 0.02f;
+
+        _xVelocityString = Animator.StringToHash("xVelocity");
+        _airborneString = Animator.StringToHash("Airborne");
     }
 
     void Update()
     {
-
         _move.x = m_MoveAction.ReadValue<Vector2>().x;
 
         GravityAdjust(); //adjusts gravity
@@ -83,9 +90,12 @@ public class PlayerController : MonoBehaviour
             xVelocity = Mathf.Lerp(xVelocity, 0f, deceleration * Time.deltaTime);
         }
 
+        
         rb2D.linearVelocity = new Vector2(xVelocity, rb2D.linearVelocity.y);
 
-        _animator.SetFloat("xVelocity", Mathf.Abs(xVelocity / maxSpeed));
+        _spriteRenderer.flipX = xVelocity != 0 && xVelocity > 0f;
+
+        _animator.SetFloat(_xVelocityString, Mathf.Abs(xVelocity / maxSpeed));
     }
 
     private void GroundCheck()
@@ -96,7 +106,15 @@ public class PlayerController : MonoBehaviour
 
         //Fire a raycast
         RaycastHit2D hit = Physics2D.Raycast(rayPos, Vector2.down, groundCheckDistance);
-        _animator.SetBool("Airborne", !hit);
+        if (!_isGrounded && hit)
+        {
+            Tween.PunchScale(_spriteBase.transform, new Vector3(0.3f, -0.2f, 0.3f), 0.2f, 5);
+        }
+
+        Debug.Log("hit: " + hit);
+        _isGrounded = hit;
+
+        _animator.SetBool(_airborneString, !_isGrounded);
 
         //Debug draw our ray so we can see it.
         Debug.DrawRay(rayPos, Vector2.down * groundCheckDistance);
@@ -104,8 +122,6 @@ public class PlayerController : MonoBehaviour
         // If it hits something...
         if (hit.collider != null)
             currentJumps = 0;
-
-
     }
 
     private void Jump()
@@ -113,6 +129,7 @@ public class PlayerController : MonoBehaviour
         //if we press the button and have jumps remaining
         if (m_JumpAction.WasPressedThisFrame() && currentJumps < maxJumps)
         {
+            Tween.PunchScale(_spriteBase.transform, _jumpTween);
             currentJumps++;
             //Apply our jump power in the y direction
             rb2D.linearVelocity = new Vector2(rb2D.linearVelocity.x, jumpPower);
