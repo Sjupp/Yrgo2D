@@ -43,10 +43,24 @@ namespace Battleship
         }
     }
 
+    public class Hej
+    {
+        public void Foo()
+        {
+            var gurkÄtarKlass = new AntLin();
+            var asdf = gurkÄtarKlass.Gurkor;
+        }
+    }
+
     public class AntLin : IBattleship
     {
         bool[,] myPlayField;
         Vector2Int gridSize;
+
+        private float _gurkor = 0;
+
+        public float Gurkor { get => _gurkor; }
+
 
         public string GetName()
         {
@@ -65,6 +79,8 @@ namespace Battleship
             //opponents names and tactics.
 
             //we now need to place our ships, lets just do one for the demo.
+
+            var selectedEnum = Direction.Right;
 
             //Since we haven't placed all our ships, this would not validate.
 
