@@ -4,25 +4,29 @@ using UnityEngine;
 
 namespace Battleship
 {
+    #region data
     public struct Turn
     {
         private int _turnOwnerID;
         private Vector2Int _fireTarget;
         private bool _hit;
         private int _shipCellsRemaining;
+        private bool _gameOver;
 
-        public Turn(int turnOwnerID, Vector2Int fireTarget, bool hit, int shipCellsRemaining) : this()
+        public Turn(int turnOwnerID, Vector2Int fireTarget, bool hit, int shipCellsRemaining, bool gameOver) : this()
         {
             TurnOwnerID = turnOwnerID;
             FireTarget = fireTarget;
             Hit = hit;
             ShipCellsRemaining = shipCellsRemaining;
+            GameOver = gameOver;
         }
 
-        public int TurnOwnerID { get => _turnOwnerID; set => _turnOwnerID = value; }
+        public int TurnOwnerID { readonly get => _turnOwnerID; set => _turnOwnerID = value; }
         public Vector2Int FireTarget { readonly get => _fireTarget; set => _fireTarget = value; }
         public bool Hit { readonly get => _hit; set => _hit = value; }
-        public int ShipCellsRemaining { get => _shipCellsRemaining; set => _shipCellsRemaining = value; }
+        public int ShipCellsRemaining { readonly get => _shipCellsRemaining; set => _shipCellsRemaining = value; }
+        public bool GameOver { readonly get => _gameOver; set => _gameOver = value; }
     }
 
     public class GameData
@@ -83,6 +87,7 @@ namespace Battleship
         public int RemainingCells => _ships.Sum(x => x.Length) - _ships.Sum(x => x.Damaged);
         public bool NoRemainingShips => _ships.Count(x => x.Sunk) == _ships.Count;
     }
+    #endregion
 
     public class BattleshipSimulator : MonoBehaviour
     {
@@ -105,15 +110,18 @@ namespace Battleship
         {
             _stopwatch.Start();
 
-            Dictionary<string, int> scoreTally = new Dictionary<string, int>();
+            Dictionary<string, int> scoreTally = new();
+            List<GameData> recordedGames = new();
+            
             for (int i = 0; i < _numberOfTestsToRun; i++)
             {
                 if (SetupGame(new OttWen(), new OttWen(), out GameData gameData))
                 {
                     var gameResult = RunGame(gameData);
+                    recordedGames.Add(gameResult);
                     
-                    Debug.Log("Game " + i + " result, winner: " + gameResult.Winner);
-                    Debug.Log("Discrepancy " + gameResult.GameResultDiscrepancy);
+                    //Debug.Log("Game " + i + " result, winner: " + gameResult.Winner);
+                    //Debug.Log("Discrepancy " + gameResult.GameResultDiscrepancy);
                     
                     if (scoreTally.ContainsKey(gameResult.Winner))
                     {
@@ -123,12 +131,18 @@ namespace Battleship
                     {
                         scoreTally.Add(gameResult.Winner, 1);
                     }
-
-                    BattleshipReplay.Instance.ReplayGame(gameResult);
                 }
             }
 
+
             var maxKey = scoreTally.Aggregate((l, r) => l.Value > r.Value ? l : r).Key;
+
+            var gameToReplay = recordedGames.Where(x => x.Winner == maxKey).OrderBy(x => x.GameResultDiscrepancy).FirstOrDefault();
+            if (gameToReplay != null)
+            {
+                BattleshipReplay.Instance.ReplayGame(gameToReplay);
+            }
+
             Debug.Log("Total winner " + maxKey + " with " + scoreTally[maxKey] + " wins!");
             Debug.Log("Simulation time " + _stopwatch.Elapsed);
             _stopwatch.Stop();
@@ -224,14 +238,14 @@ namespace Battleship
                 var attackResult = Attack(attackingPlayer.InterfaceRef.Fire(), defendingPlayer);
                 attackingPlayer.InterfaceRef.Result(attackResult.Item1, attackResult.Item2, attackResult.Item3);
 
-                gameData.TurnHistory.Add(new Turn(turn % 2, attackResult.Item1, attackResult.Item2, defendingPlayer.RemainingCells));
+                gameOver = defendingPlayer.NoRemainingShips;
+                gameData.TurnHistory.Add(new Turn(turn % 2, attackResult.Item1, attackResult.Item2, defendingPlayer.RemainingCells, gameOver));
 
-                if (defendingPlayer.NoRemainingShips)
+                if (gameOver)
                 {
                     gameData.Winner = attackingPlayer.UserName;
                     gameData.Loser = defendingPlayer.UserName;
                     gameData.GameResultDiscrepancy = attackingPlayer.RemainingCells - defendingPlayer.RemainingCells;
-                    gameOver = true;
                 }
                 else
                 {

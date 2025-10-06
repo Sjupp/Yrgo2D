@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace Battleship
@@ -33,7 +32,6 @@ namespace Battleship
                 Destroy(gameObject);
             }
         }
-
 
         public void ReplayGame(GameData gameData)
         {
