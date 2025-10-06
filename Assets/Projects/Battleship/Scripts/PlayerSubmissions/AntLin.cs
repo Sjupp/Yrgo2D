@@ -41,12 +41,22 @@ namespace Battleship
         {
             return (Direction)Random.Range(0, 4);
         }
+
+        public static bool IsCoordinateInsideGrid(Vector2Int gridSize, Vector2Int coordinate)
+        {
+            return !(coordinate.x < 0 || coordinate.x >= gridSize.x || coordinate.y < 0 || coordinate.y >= gridSize.y);
+        }
     }
 
     public class AntLin : IBattleship
     {
         bool[,] myPlayField;
         Vector2Int gridSize;
+
+        private float _gurkor = 0;
+
+        public float Gurkor { get => _gurkor; }
+
 
         public string GetName()
         {
@@ -59,12 +69,6 @@ namespace Battleship
             myPlayField = new bool[gridSize.x, gridSize.y];
 
             this.gridSize = gridSize;
-
-            //You don't need to do anything with opponent Name
-            //this is more if you want to keep track of your 
-            //opponents names and tactics.
-
-            //we now need to place our ships, lets just do one for the demo.
 
             //Since we haven't placed all our ships, this would not validate.
 
@@ -79,11 +83,14 @@ namespace Battleship
                     Helper.RandomDirection()
                     ))
                 {
+                    //Debug.Log("placed ship of size: " + placedShips[placedShipNumber]);
                     placedShipNumber++;
                 }
 
-                if (placedShipNumber == placedShips.Count - 1)
+                if (placedShipNumber == placedShips.Count)
+                {
                     placedAllShips = true;
+                }
             }
 
             return myPlayField;
