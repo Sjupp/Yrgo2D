@@ -1,6 +1,5 @@
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.UIElements;
 
 namespace Battleship
 {
@@ -13,6 +12,11 @@ namespace Battleship
             _x = x;
             _y = y;
             transform.localScale = Vector3.one * scale;
+        }
+
+        public void Marked()
+        {
+            GetComponent<SpriteRenderer>().color = new Color(0.8f, 0.8f, 0.8f);
         }
 
         //private void OnDrawGizmos()

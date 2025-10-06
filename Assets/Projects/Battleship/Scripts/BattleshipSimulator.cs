@@ -9,35 +9,37 @@ namespace Battleship
         private int _turnOwnerID;
         private Vector2Int _fireTarget;
         private bool _hit;
+        private int _shipCellsRemaining;
 
-        public Turn(int turnOwnerID, Vector2Int fireTarget, bool hit) : this()
+        public Turn(int turnOwnerID, Vector2Int fireTarget, bool hit, int shipCellsRemaining) : this()
         {
             TurnOwnerID = turnOwnerID;
             FireTarget = fireTarget;
             Hit = hit;
+            ShipCellsRemaining = shipCellsRemaining;
         }
 
         public int TurnOwnerID { get => _turnOwnerID; set => _turnOwnerID = value; }
         public Vector2Int FireTarget { readonly get => _fireTarget; set => _fireTarget = value; }
         public bool Hit { readonly get => _hit; set => _hit = value; }
+        public int ShipCellsRemaining { get => _shipCellsRemaining; set => _shipCellsRemaining = value; }
     }
 
     public class GameData
     {
         private UserData _user0;
         private UserData _user1;
-
         private string _winner = "";
         private string _loser = "";
         private List<Turn> _turns = new List<Turn>();
         private int _gameResultDiscrepancy = 0;
 
+        public UserData User0 { get => _user0; }
+        public UserData User1 { get => _user1; }
         public string Winner { get => _winner; set => _winner = value; }
         public string Loser { get => _loser; set => _loser = value; }
         public List<Turn> TurnHistory { get => _turns; set => _turns = value; }
         public int GameResultDiscrepancy { get => _gameResultDiscrepancy; set => _gameResultDiscrepancy = value; }
-        public UserData User0 { get => _user0; }
-        public UserData User1 { get => _user1; }
 
         public void SetUsers(UserData user0, UserData user1)
         {
@@ -49,6 +51,7 @@ namespace Battleship
     public class ShipData
     {
         private List<Vector2Int> _shipCoordinates = new();
+        private List<Vector2Int> _damagedCoordinates = new();
 
         public ShipData(List<Vector2Int> shipCoordinates)
         {
@@ -56,30 +59,33 @@ namespace Battleship
         }
 
         public List<Vector2Int> ShipCoordinates { get => _shipCoordinates; set => _shipCoordinates = value; }
+        public List<Vector2Int> DamagedCoordinates { get => _damagedCoordinates; set => _damagedCoordinates = value; }
 
         public int Length => _shipCoordinates.Count;
-        public bool Sunk => _shipCoordinates.Count == 0;
+        public int Damaged => _damagedCoordinates.Count;
+        public bool Sunk => _shipCoordinates.Count == _damagedCoordinates.Count;
+
     }
 
     public class UserData
     {
+        private int _playerID = -1;
         private string userName = "";
         private bool[,] grid = null;
         private IBattleship _interfaceRef = null;
         private List<ShipData> _ships = null;
 
+        public int PlayerID { get => _playerID; set => _playerID = value; }
         public string UserName { get => userName; set => userName = value; }
         public bool[,] Grid { get => grid; set => grid = value; }
         public IBattleship InterfaceRef { get => _interfaceRef; set => _interfaceRef = value; }
         public List<ShipData> ShipData { get => _ships; set => _ships = value; }
-        public int RemainingCells => _ships.Sum(x => x.Length);
-        public bool NoRemainingShips { get => _ships.Count == 0; }
+        public int RemainingCells => _ships.Sum(x => x.Length) - _ships.Sum(x => x.Damaged);
+        public bool NoRemainingShips => _ships.Count(x => x.Sunk) == _ships.Count;
     }
 
     public class BattleshipSimulator : MonoBehaviour
     {
-        //private bool[,] _tempGrid = null;
-
         [SerializeField]
         private List<IBattleship> _players = new List<IBattleship>();
         [SerializeField]
@@ -173,6 +179,8 @@ namespace Battleship
         private UserData BuildUserData(IBattleship user, string oppName, int userIndex)
         {
             var userData = new UserData();
+            userData.PlayerID = userIndex;
+
             if (userIndex == 0)
             {
                 if (_overrideNameOfPlayerA != null)
@@ -216,7 +224,7 @@ namespace Battleship
                 var attackResult = Attack(attackingPlayer.InterfaceRef.Fire(), defendingPlayer);
                 attackingPlayer.InterfaceRef.Result(attackResult.Item1, attackResult.Item2, attackResult.Item3);
 
-                gameData.TurnHistory.Add(new Turn(turn % 2, attackResult.Item1, attackResult.Item2));
+                gameData.TurnHistory.Add(new Turn(turn % 2, attackResult.Item1, attackResult.Item2, defendingPlayer.RemainingCells));
 
                 if (defendingPlayer.NoRemainingShips)
                 {
@@ -243,21 +251,22 @@ namespace Battleship
         private bool TrySinkShip(List<ShipData> ships, Vector2Int attackingCoordinate)
         {
             bool sunkShip = false;
-            ShipData shipToRemove = null;
             foreach (var ship in ships)
             {
                 if (ship.ShipCoordinates.Contains(attackingCoordinate))
                 {
-                    ship.ShipCoordinates.Remove(attackingCoordinate);
+                    if (!ship.DamagedCoordinates.Contains(attackingCoordinate))
+                    {
+                        ship.DamagedCoordinates.Add(attackingCoordinate);
+                    }
+
                     if (ship.Sunk)
                     {
                         sunkShip = true;
-                        shipToRemove = ship;
                     }
                 }
             }
-            ships.Remove(shipToRemove);
-
+            
             return sunkShip;
         }
 
@@ -351,7 +360,6 @@ namespace Battleship
                 }
             }
 
-            //Debug.Log("Found ship of " + reached.Count + " length");
             return reached;
         }
 
@@ -369,25 +377,5 @@ namespace Battleship
             }
             return list;
         }
-
-        //private void OnDrawGizmos()
-        //{
-        //    if (_tempGrid != null)
-        //    {
-        //        for (int x = 0; x < _tempGrid.GetLength(1); x++)
-        //        {
-        //            for (int y = 0; y < _tempGrid.GetLength(0); y++)
-        //            {
-        //                Gizmos.color = Color.yellow;
-        //                Gizmos.DrawWireCube(Vector3.right * x + Vector3.up * y, Vector3.one);
-        //                if (_tempGrid[x,y])
-        //                {
-        //                    Gizmos.color = Color.magenta;
-        //                    Gizmos.DrawSphere(Vector3.right * x + Vector3.up * y, 0.45f);
-        //                }
-        //            }
-        //        }
-        //    }
-        //}
     }
 }

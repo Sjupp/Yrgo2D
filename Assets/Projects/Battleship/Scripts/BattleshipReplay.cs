@@ -20,10 +20,7 @@ namespace Battleship
         [SerializeField] private PlayerVisuals _player0Visuals = null;
         [SerializeField] private PlayerVisuals _player1Visuals = null;
 
-        Dictionary<Vector2Int, GameTile> _coordinateDisplay0 = new();
-        Dictionary<Vector2Int, GameTile> _coordinateDisplay1 = new();
-
-        //public Action<int, >
+        public Action<Turn> TurnEvent;
 
         private void Awake()
         {
@@ -40,8 +37,8 @@ namespace Battleship
 
         public void ReplayGame(GameData gameData)
         {
-            _player0Visuals.SetupReplayVisuals(gameData, _gridSize, _gridSpacing);
-            _player1Visuals.SetupReplayVisuals(gameData, _gridSize, _gridSpacing);
+            _player0Visuals.SetupReplayVisuals(this, gameData, 0, _gridSize, _gridSpacing);
+            _player1Visuals.SetupReplayVisuals(this, gameData, 1, _gridSize, _gridSpacing);
 
             StartCoroutine(RunSimulation(gameData));
         }
@@ -53,12 +50,11 @@ namespace Battleship
                 var playerRef = i % 2 == 0 ? _player0Visuals : _player1Visuals;
                 var turnData = gameData.TurnHistory[i];
 
-                playerRef.GetAttacked(turnData.FireTarget, turnData.Hit);
+                TurnEvent?.Invoke(turnData);
 
                 float turnsPerSecond = 1f / Mathf.Max(_turnsPerSecond, 0.001f);
                 yield return new WaitForSeconds(turnsPerSecond);
             }
         }
     }
-
 }
