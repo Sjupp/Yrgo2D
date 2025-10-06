@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 //This script is a clean powerful solution to a top-down movement player
 public class PlayerControllerA : MonoBehaviour
@@ -22,9 +23,21 @@ public class PlayerControllerA : MonoBehaviour
     float feetOffset; //Length of the raycast
     int currentJumps = 0; //remaining jumps, also works as ground check
 
-    private void Start()
+    // references to the input actions of the new Input System
+    private InputAction moveAction;
+    private InputAction jumpAction;
+
+    void Awake()
     {
         rb2D = GetComponent<Rigidbody2D>(); //assign our ref.
+
+        //Using new input system
+        moveAction = InputSystem.actions.FindAction("Player/Move");
+        jumpAction = InputSystem.actions.FindAction("Player/Jump");
+
+        //Requires enabling because actions are disabled by default
+        moveAction.Enable();
+        jumpAction.Enable();
 
         //setting so raycasts don't hit the object they start in.
         Physics2D.queriesStartInColliders = false;
@@ -53,24 +66,19 @@ public class PlayerControllerA : MonoBehaviour
 
     private void HorizontalMovement()
     {
-        //Get the raw input
-        float x = Input.GetAxisRaw("Horizontal");
+        //Read hoziontal input value
+        float x = moveAction.ReadValue<Vector2>().x;
 
-        //add our input to our velocity
-        //This provides acceleration +10m/s/s
-        xVelocity += x * acceleration * Time.deltaTime;
-
-        //Check our max speed, if our magnitude is faster them max speed
-        xVelocity = Mathf.Clamp(xVelocity, -maxSpeed, maxSpeed);
-
-        //If we have zero input from the player
-        //(x < 0 == xVelocity > 0) checks if input is in the opposite direction of movement
-        if (x == 0 || (x < 0) == (xVelocity > 0))
+        //If x is anything other than 0, we're either pressing left or right
+        if (x != 0)
         {
-            //Reduce our speed based on how fast we are going
-            //A value of 0.9 would remove 10% or our speed
-            xVelocity *= 1 - deceleration * Time.deltaTime;
-            xVelocity *= Mathf.Clamp01(1 - deceleration * Time.fixedDeltaTime);
+            //Lerp towards max speed in x direction
+            xVelocity = Mathf.Lerp(xVelocity, x * maxSpeed, acceleration * Time.deltaTime);
+        }
+        else
+        {
+            //Lerp towards 0 velocity if we're not sending any input
+            xVelocity = Mathf.Lerp(xVelocity, 0f, deceleration * Time.deltaTime);
         }
 
         //Now we can move with the rigidbody and we get proper collisions
@@ -97,14 +105,14 @@ public class PlayerControllerA : MonoBehaviour
     private void Jump()
     {
         //if we press the button and have jumps remaining
-        if (Input.GetButtonDown("Jump") && currentJumps < maxJumps)
+        if (jumpAction.WasPressedThisFrame() && currentJumps < maxJumps)
         {
             currentJumps++;
             //Apply our jump power in the y direction
             rb2D.linearVelocity = new Vector2(rb2D.linearVelocity.x, jumpPower);
         }
 
-        if (Input.GetButtonUp("Jump") && rb2D.linearVelocity.y > 0)
+        if (jumpAction.WasReleasedThisFrame() && rb2D.linearVelocity.y > 0)
         {
             //Cut the jump short by reducing the upward velocity.
             //Same result as button down but on one line.
