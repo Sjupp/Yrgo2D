@@ -6,17 +6,18 @@ namespace Battleship
 {
     public struct Turn
     {
-        //private string attackerName;
+        private int _turnOwnerID;
         private Vector2Int _fireTarget;
         private bool _hit;
 
-        public Turn(Vector2Int fireTarget, bool hit) : this()
+        public Turn(int turnOwnerID, Vector2Int fireTarget, bool hit) : this()
         {
+            TurnOwnerID = turnOwnerID;
             FireTarget = fireTarget;
             Hit = hit;
         }
 
-        //public string AttackerName { get => attackerName; set => attackerName = value; }
+        public int TurnOwnerID { get => _turnOwnerID; set => _turnOwnerID = value; }
         public Vector2Int FireTarget { readonly get => _fireTarget; set => _fireTarget = value; }
         public bool Hit { readonly get => _hit; set => _hit = value; }
     }
@@ -43,15 +44,6 @@ namespace Battleship
             _user0 = user0;
             _user1 = user1;
         }
-    }
-
-    public class SimulationData
-    {
-        private List<GameData> _gameHistory = new();
-
-        public List<GameData> GameHistory { get => _gameHistory; set => _gameHistory = value; }
-
-        // select three closest games
     }
 
     public class ShipData
@@ -86,6 +78,8 @@ namespace Battleship
 
     public class BattleshipSimulator : MonoBehaviour
     {
+        //private bool[,] _tempGrid = null;
+
         [SerializeField]
         private List<IBattleship> _players = new List<IBattleship>();
         [SerializeField]
@@ -99,12 +93,16 @@ namespace Battleship
 
         private List<int> _presetShipSizes = new List<int>() { 4, 3, 3, 2, 1 };
 
+        private System.Diagnostics.Stopwatch _stopwatch = new System.Diagnostics.Stopwatch();
+
         private void Start()
         {
+            _stopwatch.Start();
+
             Dictionary<string, int> scoreTally = new Dictionary<string, int>();
             for (int i = 0; i < _numberOfTestsToRun; i++)
             {
-                if (SetupGame(new OttWen(), new AntLin(), out GameData gameData))
+                if (SetupGame(new OttWen(), new OttWen(), out GameData gameData))
                 {
                     var gameResult = RunGame(gameData);
                     
@@ -119,11 +117,15 @@ namespace Battleship
                     {
                         scoreTally.Add(gameResult.Winner, 1);
                     }
+
+                    BattleshipReplay.Instance.ReplayGame(gameResult);
                 }
             }
 
             var maxKey = scoreTally.Aggregate((l, r) => l.Value > r.Value ? l : r).Key;
             Debug.Log("Total winner " + maxKey + " with " + scoreTally[maxKey] + " wins!");
+            Debug.Log("Simulation time " + _stopwatch.Elapsed);
+            _stopwatch.Stop();
         }
 
         private bool SetupGame(IBattleship user0, IBattleship user1, out GameData gameData)
@@ -214,13 +216,13 @@ namespace Battleship
                 var attackResult = Attack(attackingPlayer.InterfaceRef.Fire(), defendingPlayer);
                 attackingPlayer.InterfaceRef.Result(attackResult.Item1, attackResult.Item2, attackResult.Item3);
 
-                gameData.TurnHistory.Add(new Turn(attackResult.Item1, attackResult.Item2));
+                gameData.TurnHistory.Add(new Turn(turn % 2, attackResult.Item1, attackResult.Item2));
 
                 if (defendingPlayer.NoRemainingShips)
                 {
                     gameData.Winner = attackingPlayer.UserName;
                     gameData.Loser = defendingPlayer.UserName;
-                    gameData.GameResultDiscrepancy = attackingPlayer.ShipData.Count - defendingPlayer.ShipData.Count;
+                    gameData.GameResultDiscrepancy = attackingPlayer.RemainingCells - defendingPlayer.RemainingCells;
                     gameOver = true;
                 }
                 else
@@ -274,6 +276,7 @@ namespace Battleship
                     return false;
                 }
             }
+            
 
             return true;
         }
@@ -366,5 +369,25 @@ namespace Battleship
             }
             return list;
         }
+
+        //private void OnDrawGizmos()
+        //{
+        //    if (_tempGrid != null)
+        //    {
+        //        for (int x = 0; x < _tempGrid.GetLength(1); x++)
+        //        {
+        //            for (int y = 0; y < _tempGrid.GetLength(0); y++)
+        //            {
+        //                Gizmos.color = Color.yellow;
+        //                Gizmos.DrawWireCube(Vector3.right * x + Vector3.up * y, Vector3.one);
+        //                if (_tempGrid[x,y])
+        //                {
+        //                    Gizmos.color = Color.magenta;
+        //                    Gizmos.DrawSphere(Vector3.right * x + Vector3.up * y, 0.45f);
+        //                }
+        //            }
+        //        }
+        //    }
+        //}
     }
 }
