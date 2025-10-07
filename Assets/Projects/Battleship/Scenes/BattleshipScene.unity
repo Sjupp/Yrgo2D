@@ -578,8 +578,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ed9bbcdbd6c65844ba19eebb151e697d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BattleshipSimulator
-  _overrideNameOfPlayerA: Otto A
-  _overrideNameOfPlayerB: Otto B
+  _overrideNameOfPlayerA: 
+  _overrideNameOfPlayerB: 
   _numberOfTestsToRun: 100
   _gridSize: {x: 10, y: 10}
 --- !u!4 &685566863

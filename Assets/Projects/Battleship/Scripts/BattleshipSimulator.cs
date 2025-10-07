@@ -4,91 +4,6 @@ using UnityEngine;
 
 namespace Battleship
 {
-    #region data
-    public struct Turn
-    {
-        private int _turnOwnerID;
-        private Vector2Int _fireTarget;
-        private bool _hit;
-        private int _shipCellsRemaining;
-        private bool _gameOver;
-
-        public Turn(int turnOwnerID, Vector2Int fireTarget, bool hit, int shipCellsRemaining, bool gameOver) : this()
-        {
-            TurnOwnerID = turnOwnerID;
-            FireTarget = fireTarget;
-            Hit = hit;
-            ShipCellsRemaining = shipCellsRemaining;
-            GameOver = gameOver;
-        }
-
-        public int TurnOwnerID { readonly get => _turnOwnerID; set => _turnOwnerID = value; }
-        public Vector2Int FireTarget { readonly get => _fireTarget; set => _fireTarget = value; }
-        public bool Hit { readonly get => _hit; set => _hit = value; }
-        public int ShipCellsRemaining { readonly get => _shipCellsRemaining; set => _shipCellsRemaining = value; }
-        public bool GameOver { readonly get => _gameOver; set => _gameOver = value; }
-    }
-
-    public class GameData
-    {
-        private UserData _user0;
-        private UserData _user1;
-        private string _winner = "";
-        private string _loser = "";
-        private List<Turn> _turns = new List<Turn>();
-        private int _gameResultDiscrepancy = 0;
-
-        public UserData User0 { get => _user0; }
-        public UserData User1 { get => _user1; }
-        public string Winner { get => _winner; set => _winner = value; }
-        public string Loser { get => _loser; set => _loser = value; }
-        public List<Turn> TurnHistory { get => _turns; set => _turns = value; }
-        public int GameResultDiscrepancy { get => _gameResultDiscrepancy; set => _gameResultDiscrepancy = value; }
-
-        public void SetUsers(UserData user0, UserData user1)
-        {
-            _user0 = user0;
-            _user1 = user1;
-        }
-    }
-
-    public class ShipData
-    {
-        private List<Vector2Int> _shipCoordinates = new();
-        private List<Vector2Int> _damagedCoordinates = new();
-
-        public ShipData(List<Vector2Int> shipCoordinates)
-        {
-            ShipCoordinates = shipCoordinates;
-        }
-
-        public List<Vector2Int> ShipCoordinates { get => _shipCoordinates; set => _shipCoordinates = value; }
-        public List<Vector2Int> DamagedCoordinates { get => _damagedCoordinates; set => _damagedCoordinates = value; }
-
-        public int Length => _shipCoordinates.Count;
-        public int Damaged => _damagedCoordinates.Count;
-        public bool Sunk => _shipCoordinates.Count == _damagedCoordinates.Count;
-
-    }
-
-    public class UserData
-    {
-        private int _playerID = -1;
-        private string userName = "";
-        private bool[,] grid = null;
-        private IBattleship _interfaceRef = null;
-        private List<ShipData> _ships = null;
-
-        public int PlayerID { get => _playerID; set => _playerID = value; }
-        public string UserName { get => userName; set => userName = value; }
-        public bool[,] Grid { get => grid; set => grid = value; }
-        public IBattleship InterfaceRef { get => _interfaceRef; set => _interfaceRef = value; }
-        public List<ShipData> ShipData { get => _ships; set => _ships = value; }
-        public int RemainingCells => _ships.Sum(x => x.Length) - _ships.Sum(x => x.Damaged);
-        public bool NoRemainingShips => _ships.Count(x => x.Sunk) == _ships.Count;
-    }
-    #endregion
-
     public class BattleshipSimulator : MonoBehaviour
     {
         [SerializeField]
@@ -104,120 +19,109 @@ namespace Battleship
 
         private List<int> _presetShipSizes = new List<int>() { 4, 3, 3, 2, 1 };
 
-        private System.Diagnostics.Stopwatch _stopwatch = new System.Diagnostics.Stopwatch();
 
         private void Start()
         {
-            _stopwatch.Start();
-
             Dictionary<string, int> scoreTally = new();
             List<GameData> recordedGames = new();
             
             for (int i = 0; i < _numberOfTestsToRun; i++)
             {
-                if (SetupGame(new OttWen(), new OttWen(), out GameData gameData))
+                GameData preparedGameData = SetupGame(new OttWen(), new OttWen());
+                GameData gameResult = null;
+
+                if (preparedGameData == null)
                 {
-                    var gameResult = RunGame(gameData);
+                    // tie game, no successful setup
+                }
+                else if (string.IsNullOrEmpty(preparedGameData.Winner))
+                {
+                    // only one succesful validation, count as win
+                    gameResult = preparedGameData;
+                }
+                else
+                {
+                    gameResult = RunGame(preparedGameData);
                     recordedGames.Add(gameResult);
-                    
-                    //Debug.Log("Game " + i + " result, winner: " + gameResult.Winner);
-                    //Debug.Log("Discrepancy " + gameResult.GameResultDiscrepancy);
-                    
-                    if (scoreTally.ContainsKey(gameResult.Winner))
-                    {
-                        scoreTally[gameResult.Winner] += 1;
-                    }
-                    else
-                    {
-                        scoreTally.Add(gameResult.Winner, 1);
-                    }
+                }
+
+                if (scoreTally.ContainsKey(gameResult.Winner))
+                {
+                    scoreTally[gameResult.Winner] += 1;
+                }
+                else
+                {
+                    scoreTally.Add(gameResult.Winner, 1);
+                }
+
+            }
+
+            if (scoreTally.Keys.Count > 0)
+            {
+                var maxKey = scoreTally.Aggregate((l, r) => l.Value > r.Value ? l : r).Key;
+                var gameToReplay = recordedGames.Where(x => x.Winner == maxKey).OrderBy(x => x.GameResultDiscrepancy).FirstOrDefault();
+                if (gameToReplay != null)
+                {
+                    BattleshipReplay.Instance.ReplayGame(gameToReplay);
                 }
             }
-
-
-            var maxKey = scoreTally.Aggregate((l, r) => l.Value > r.Value ? l : r).Key;
-
-            var gameToReplay = recordedGames.Where(x => x.Winner == maxKey).OrderBy(x => x.GameResultDiscrepancy).FirstOrDefault();
-            if (gameToReplay != null)
-            {
-                BattleshipReplay.Instance.ReplayGame(gameToReplay);
-            }
-
-            Debug.Log("Total winner " + maxKey + " with " + scoreTally[maxKey] + " wins!");
-            Debug.Log("Simulation time " + _stopwatch.Elapsed);
-            _stopwatch.Stop();
         }
 
-        private bool SetupGame(IBattleship user0, IBattleship user1, out GameData gameData)
+        private GameData SetupGame(IBattleship user0, IBattleship user1)
         {
-            gameData = null;
+            int validations = 0;
+            var userData0 = BuildUserData(user0, 0);
+            bool user0Validated = ValidateData(userData0, _presetShipSizes);
+            validations += user0Validated ? 1 : 0;
 
-            string username0 = user0.GetName();
-            string username1 = user1.GetName();
-            if (ValidateName(user0))
-            {
-                username0 = user0.GetName();
-            }
-            else
-            {
-                return false;
-            }
 
-            if (ValidateName(user1))
-            {
-                username1 = user1.GetName();
-            }
-            else
-            {
-                return false;
-            }
+            var userData1 = BuildUserData(user1, 1);
+            bool user1Validated = ValidateData(userData1, _presetShipSizes);
+            validations += user1Validated ? 1 : 0;
 
-            var userData0 = BuildUserData(user0, username1, 0);
-            if (!ValidateGameBoard(userData0, _presetShipSizes))
-            {
-                return false;
-            }
 
-            var userData1 = BuildUserData(user1, username0, 1);
-            if (!ValidateGameBoard(userData1, _presetShipSizes))
-            {
-                return false;
-            }
-
-            gameData = new GameData();
+            var gameData = new GameData();
             gameData.SetUsers(userData0, userData1);
 
-            return true;
+            if (validations == 0)
+            {
+                return null;
+            }
+            else if (validations == 1)
+            {
+                if (user0Validated)
+                {
+                    gameData.Winner = gameData.User0.UserName;
+                }
+                else
+                {
+                    gameData.Winner = gameData.User1.UserName;
+                }
+                return gameData;
+            }
+            else
+            {
+                return gameData;
+            }
         }
 
-        private UserData BuildUserData(IBattleship user, string oppName, int userIndex)
+        private UserData BuildUserData(IBattleship user, int userIndex)
         {
-            var userData = new UserData();
-            userData.PlayerID = userIndex;
+            var userData = new UserData
+            {
+                PlayerID = userIndex
+            };
 
             if (userIndex == 0)
             {
-                if (_overrideNameOfPlayerA != null)
-                {
-                    userData.UserName = _overrideNameOfPlayerA;
-                }
-                else
-                {
-                    userData.UserName = user.GetName();
-                }
+                userData.UserName = _overrideNameOfPlayerA ?? user.GetName();
             }
             else if (userIndex == 1)
             {
-                if (_overrideNameOfPlayerB != null)
-                {
-                    userData.UserName = _overrideNameOfPlayerB;
-                }
-                else
-                {
-                    userData.UserName = user.GetName();
-                }
+                userData.UserName = _overrideNameOfPlayerB  ?? user.GetName();
             }
-            userData.Grid = user.NewGame(_gridSize, oppName);
+
+            userData.Grid = user.NewGame(_gridSize, "");
             userData.InterfaceRef = user;
             userData.ShipData = FindShips(userData.Grid);
 
@@ -284,13 +188,19 @@ namespace Battleship
             return sunkShip;
         }
 
-        private bool ValidateGameBoard(UserData userData, List<int> presetShipSizes)
+        private bool ValidateData(UserData userData, List<int> presetShipSizes)
         {
+            if (string.IsNullOrEmpty(userData.UserName))
+            {
+                Debug.Log("Not Valid: UserName is empty");
+            }
+
             if (userData.Grid.GetLength(1) != _gridSize.x || userData.Grid.GetLength(0) != _gridSize.y)
             {
                 Debug.Log("Not Valid: GridSize");
                 return false;
             }
+
             foreach (var ship in userData.ShipData)
             {
                 if (!presetShipSizes.Contains(ship.Length))
@@ -299,23 +209,7 @@ namespace Battleship
                     return false;
                 }
             }
-            
 
-            return true;
-        }
-
-        private bool ValidateName(IBattleship playerInterface)
-        {
-            if (playerInterface == null)
-            {
-                Debug.Log("Not Valid: UserData");
-                return false;
-            }
-            if (string.IsNullOrEmpty(playerInterface.GetName()))
-            {
-                Debug.Log("Not Valid: UserName");
-                return false;
-            }
             return true;
         }
 
