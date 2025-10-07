@@ -30,13 +30,12 @@ namespace Battleship
                 GameData preparedGameData = SetupGame(new OttWen(), new OttWen());
                 GameData gameResult = null;
 
-                if (preparedGameData == null)
+                if (preparedGameData == null) // failed preparation
                 {
-                    // tie game, no successful setup
+
                 }
-                else if (string.IsNullOrEmpty(preparedGameData.Winner))
+                else if (!string.IsNullOrEmpty(preparedGameData.Winner)) // one sided validation, winner already decided
                 {
-                    // only one succesful validation, count as win
                     gameResult = preparedGameData;
                 }
                 else
@@ -44,6 +43,7 @@ namespace Battleship
                     gameResult = RunGame(preparedGameData);
                     recordedGames.Add(gameResult);
                 }
+
 
                 if (scoreTally.ContainsKey(gameResult.Winner))
                 {
@@ -56,6 +56,7 @@ namespace Battleship
 
             }
 
+            // pick the most close game and replay it
             if (scoreTally.Keys.Count > 0)
             {
                 var maxKey = scoreTally.Aggregate((l, r) => l.Value > r.Value ? l : r).Key;
@@ -74,11 +75,9 @@ namespace Battleship
             bool user0Validated = ValidateData(userData0, _presetShipSizes);
             validations += user0Validated ? 1 : 0;
 
-
             var userData1 = BuildUserData(user1, 1);
             bool user1Validated = ValidateData(userData1, _presetShipSizes);
             validations += user1Validated ? 1 : 0;
-
 
             var gameData = new GameData();
             gameData.SetUsers(userData0, userData1);
@@ -114,11 +113,11 @@ namespace Battleship
 
             if (userIndex == 0)
             {
-                userData.UserName = _overrideNameOfPlayerA ?? user.GetName();
+                userData.UserName = string.IsNullOrEmpty(_overrideNameOfPlayerA) ? user.GetName() : _overrideNameOfPlayerA;
             }
             else if (userIndex == 1)
             {
-                userData.UserName = _overrideNameOfPlayerB  ?? user.GetName();
+                userData.UserName = string.IsNullOrEmpty(_overrideNameOfPlayerB) ? user.GetName() : _overrideNameOfPlayerB;
             }
 
             userData.Grid = user.NewGame(_gridSize, "");

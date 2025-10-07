@@ -98,15 +98,12 @@ namespace Battleship
 
         private void OnTurnEvent(Turn turn)
         {
-            if (turn.TurnOwnerID == _playerID)
+            bool yourTurn = turn.TurnOwnerID == _playerID;
+            if (yourTurn)
             {
                 if (turn.Hit)
                 {
                     _expressionRenderer.sprite = _playerExpressions[2]; // smug
-                }
-                else if (turn.ShipCellsRemaining != 1)
-                {
-                    _expressionRenderer.sprite = _playerExpressions[3]; // look
                 }
             }
             else
@@ -121,6 +118,7 @@ namespace Battleship
                     entry.Value.PunchTile(dir, _punchStrength - Mathf.Clamp((entry.Value.transform.position - targetPosition).sqrMagnitude, 0, _punchStrength));
                 }
 
+                BoardEffects(turn.FireTarget, turn.Hit);
 
                 if (turn.Hit)
                 {
@@ -133,12 +131,18 @@ namespace Battleship
                         _expressionRenderer.sprite = _playerExpressions[1]; // sad
                     }
                 }
-                else if (turn.ShipCellsRemaining != 1)
+                else
                 {
-                    _expressionRenderer.sprite = _playerExpressions[0]; // content
+                    if (turn.ShipCellsRemaining == 1)
+                    {
+                        _expressionRenderer.sprite = _playerExpressions[3]; // look
+                    }
+                    else
+                    {
+                        _expressionRenderer.sprite = _playerExpressions[0]; // content
+                    }
                 }
 
-                BoardEffects(turn.FireTarget, turn.Hit);
             }
         }
 
