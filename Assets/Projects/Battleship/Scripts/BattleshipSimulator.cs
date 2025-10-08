@@ -60,10 +60,12 @@ namespace Battleship
             if (scoreTally.Keys.Count > 0)
             {
                 var maxKey = scoreTally.Aggregate((l, r) => l.Value > r.Value ? l : r).Key;
-                var gameToReplay = recordedGames.Where(x => x.Winner == maxKey).OrderBy(x => x.GameResultDiscrepancy).FirstOrDefault();
-                if (gameToReplay != null)
+                var lowestDiscrepancyReplay = recordedGames.Where(x => x.Winner == maxKey).OrderBy(x => x.GameResultDiscrepancy).FirstOrDefault();
+                var highestDiscrepancyReplay = recordedGames.Where(x => x.Winner == maxKey).OrderByDescending(x => x.GameResultDiscrepancy).FirstOrDefault();
+                Debug.Log("Winner: " + maxKey + " with " + scoreTally[maxKey] + " wins, ship discrepancies, highest/lowest: " + highestDiscrepancyReplay.GameResultDiscrepancy + "/" + lowestDiscrepancyReplay.GameResultDiscrepancy);
+                if (lowestDiscrepancyReplay != null)
                 {
-                    BattleshipReplay.Instance.ReplayGame(gameToReplay);
+                    BattleshipReplay.Instance.ReplayGame(lowestDiscrepancyReplay);
                 }
             }
         }
@@ -139,10 +141,10 @@ namespace Battleship
                 var attackingPlayer = turn % 2 == 0 ? gameData.User0 : gameData.User1;
                 var defendingPlayer = turn % 2 == 1 ? gameData.User0 : gameData.User1;
                 var attackResult = Attack(attackingPlayer.InterfaceRef.Fire(), defendingPlayer);
-                attackingPlayer.InterfaceRef.Result(attackResult.Item1, attackResult.Item2, attackResult.Item3);
+                attackingPlayer.InterfaceRef.Result(attackResult.targetCoordinate, attackResult.hit, attackResult.sunkShip);
 
                 gameOver = defendingPlayer.NoRemainingShips;
-                gameData.TurnHistory.Add(new Turn(turn % 2, attackResult.Item1, attackResult.Item2, defendingPlayer.RemainingCells, gameOver));
+                gameData.TurnHistory.Add(new Turn(turn % 2, attackResult.targetCoordinate, attackResult.hit, defendingPlayer.RemainingCells, gameOver));
 
                 if (gameOver)
                 {
@@ -212,7 +214,7 @@ namespace Battleship
             return true;
         }
 
-        private (Vector2Int, bool, bool) Attack(Vector2Int attackingCoordinate, UserData defendingUser)
+        private (Vector2Int targetCoordinate, bool hit, bool sunkShip) Attack(Vector2Int attackingCoordinate, UserData defendingUser)
         {
             (Vector2Int, bool, bool) attackData;
             attackData.Item1 = attackingCoordinate;
@@ -257,12 +259,12 @@ namespace Battleship
             {
                 Vector2Int current = frontier.Dequeue();
                 var neighbors = GetNeighbors(grid, current);
-                foreach (Vector2Int next in neighbors)
+                foreach (Vector2Int nextNeighbor in neighbors)
                 {
-                    if (!reached.Contains(next) && grid[next.x, next.y])
+                    if (!reached.Contains(nextNeighbor) && grid[nextNeighbor.x, nextNeighbor.y])
                     {
-                        frontier.Enqueue(next);
-                        reached.Add(next);
+                        frontier.Enqueue(nextNeighbor);
+                        reached.Add(nextNeighbor);
                     }
                 }
             }
